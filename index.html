@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./assets/css/fresh-bootstrap-table.css"/>
+  <link rel="stylesheet" href="./assets/css/demo.css" />
+  <link href="//fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link href="//fonts.googleapis.com/css?family=Roboto:400,700,300" rel="stylesheet" type="text/css">
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://unpkg.com/bootstrap-table/dist/bootstrap-table.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="toolbar">
+      <div class="filter-container">
+        <div class="slider-container">
+          <label for="gla-slider" class="slider-label">GLA Size Range:</label>
+          <div id="gla-slider"></div>
+          <p>Range: <span id="gla-range"></span> sqft</p>
+          <button id="filter-button" class="btn btn-primary">Apply Filter</button>
+        </div>
+      </div>
+    </div>
+
+    <table id="mall-table" class="table table-striped table-bordered">
+      <thead>
+        <tr>
+          <th data-field="complex_id" data-sortable="true">ID</th>
+          <th data-field="name" data-sortable="true">Name</th>
+          <th data-field="street_address" data-sortable="true">Address</th>
+          <th data-field="city" data-sortable="true">City</th>
+          <th data-field="state" data-sortable="true">State</th>
+          <th data-field="postal_code" data-sortable="true">Postal Code</th>
+          <th data-field="dma_name" data-sortable="true">DMA</th>
+          <th data-field="cbsa_name" data-sortable="true">CBSA</th>
+          <th data-field="sub_category" data-sortable="true">Category</th>
+          <th data-field="area_sqft" data-sortable="true">Area (sqft)</th>
+          <th data-field="gla_sq_ft" data-sortable="true">GLA (sqft)</th>
+          <th data-field="actions" data-formatter="actionFormatter">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="mall-table-body">
+      </tbody>
+    </table>
+
+    <button id="download-button" class="btn btn-success">Download CSV</button>
+  </div>
+
+  <script>
+  let allData = [];
+  let tenantData = [];
+  console.log('Tenant Data:', tenantData);
+
+  // Fetch and parse tenant data CSV
+  fetch('./assets/tenants000000000000.csv')
+  .then(response => response.text())
+  .then(data => {
+    tenantData = Papa.parse(data, { header: true }).data;
+    console.log('Loaded Tenant Data:', tenantData);
+  })
+  .catch(error => console.error('Error loading tenant data:', error));
+
+  $(document).ready(function() {
+  const csvUrl = './assets/sc_metadata000000000000.csv';
+  
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    complete: function(results) {
+      allData = results.data;
+  
+      const glaValues = allData
+        .map(item => {
+          const glaStr = item.gla_sq_ft || '0';
+          return parseFloat(glaStr.replace(/,/g, ''));
+        })
+        .filter(val => !isNaN(val));
+      
+      if (glaValues.length > 0) {
+        const minGla = Math.min(...glaValues);
+        const maxGla = Math.max(...glaValues);
+
+        allData.forEach(item => {
+          item.raw_area_sqft = item.area_sqft;
+          item.raw_gla_sq_ft = item.gla_sq_ft;
+          item.area_sqft = numeral(item.area_sqft || '0').format('0.0a');
+          item.gla_sq_ft = numeral(item.gla_sq_ft || '0').format('0.0a');
+        });
+
+        $('#mall-table').bootstrapTable({
+          data: allData,
+          search: true,
+          pagination: true,
+          showColumns: true,
+          toolbar: '.toolbar',
+          columns: [{
+            field: 'complex_id',
+            title: 'ID',
+            sortable: true
+          }, {
+            field: 'name',
+            title: 'Name',
+            sortable: true
+          }, {
+            field: 'street_address',
+            title: 'Address',
+            sortable: true
+          }, {
+            field: 'city',
+            title: 'City',
+            sortable: true
+          }, {
+            field: 'state',
+            title: 'State',
+            sortable: true
+          }, {
+            field: 'postal_code',
+            title: 'Postal Code',
+            sortable: true
+          }, {
+            field: 'dma_name',
+            title: 'DMA',
+            sortable: true
+          }, {
+            field: 'cbsa_name',
+            title: 'CBSA',
+            sortable: true
+          }, {
+            field: 'sub_category',
+            title: 'Category',
+            sortable: true
+          }, {
+            field: 'area_sqft',
+            title: 'Area (sqft)',
+            sortable: true
+          }, {
+            field: 'gla_sq_ft',
+            title: 'GLA (sqft)',
+            sortable: true
+          }, {
+            field: 'actions',
+            title: 'Actions',
+            formatter: actionFormatter
+          }]
+        });
+
+        function actionFormatter(value, row, index) {
+          return `
+            <tr>
+              <td colspan="12">
+                <button class="btn btn-info btn-xs" onclick="toggleDetails('${row.complex_id}')">Toggle Tenant Details</button>
+                <div id="details-${row.complex_id}" class="panel-collapse collapse">
+                  <table class="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Tenant ID</th>
+                        <th>Tenant Name</th>
+                        <th>Store ID</th>
+                        <th>Chain ID</th>
+                        <th>Date Opened</th>
+                        <th>Date Closed</th>
+                        <th>Group Category</th>
+                        <th>Primary Category</th>
+                        <th>Sub Category</th>
+                        <th>Month</th>
+                        <th>FT</th>
+                        <th>YOY</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tenant-body-${row.complex_id}"></tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+
+        window.toggleDetails = function(complexId) {
+          const detailsPanel = $(`#details-${complexId}`);
+          if (detailsPanel.hasClass('in')) {
+            detailsPanel.removeClass('in');
+          } else {
+            const tenantRows = tenantData
+              .filter(tenant => tenant.complex_id === complexId)
+              .map(tenant => `
+                <tr>
+                  <td>${tenant.tenant_id}</td>
+                  <td>${tenant.tenant_name}</td>
+                  <td>${tenant.store_id}</td>
+                  <td>${tenant.chain_id}</td>
+                  <td>${tenant.date_opened}</td>
+                  <td>${tenant.date_closed}</td>
+                  <td>${tenant.tenant_group_category}</td>
+                  <td>${tenant.tenant_primary_category}</td>
+                  <td>${tenant.tenant_sub_category}</td>
+                  <td>${tenant.month}</td>
+                  <td>${tenant.ft}</td>
+                  <td>${tenant.yoy}</td>
+                </tr>
+              `).join('');
+            $(`#tenant-body-${complexId}`).html(tenantRows);
+            detailsPanel.addClass('in');
+          }
+        };
+
+        // Initialize the slider
+        $("#gla-slider").slider({
+          range: true,
+          min: minGla,
+          max: maxGla,
+          values: [minGla, maxGla],
+          slide: function(event, ui) {
+            $("#gla-range").text(`${ui.values[0]} - ${ui.values[1]}`);
+          }
+        });
+
+        $("#gla-range").text(`${$("#gla-slider").slider("values", 0)} - ${$("#gla-slider").slider("values", 1)}`);
+
+        $("#filter-button").click(function() {
+          const minGla = $("#gla-slider").slider("values", 0);
+          const maxGla = $("#gla-slider").slider("values", 1);
+
+          const filteredData = allData.filter(item => {
+            const glaStr = item.raw_gla_sq_ft || '0';
+            const gla = parseFloat(glaStr.replace(/,/g, ''));
+            return !isNaN(gla) && gla >= minGla && gla <= maxGla;
+          });
+
+          $('#mall-table').bootstrapTable('load', filteredData);
+        });
+
+        // Download CSV button functionality
+        $("#download-button").click(function() {
+          const csv = Papa.unparse(allData);
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.setAttribute('download', 'filtered_data.csv');
+          document.body.appendChild(link);
+          link.click();
+        });
+      }
+    }
+  });
+});
+
+  </script>
+</body>
+</html>
