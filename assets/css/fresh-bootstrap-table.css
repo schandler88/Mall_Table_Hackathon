@@ -96,7 +96,7 @@
   width: 100% !important;
   margin-bottom: 0 !important;
 }
-.bootstrap-table .fixed-table-container .table th,
+.bootstrap-tabljje .fixed-table-container .table th,
 .bootstrap-table .fixed-table-container .table td {
   vertical-align: middle;
   box-sizing: border-box;
@@ -483,9 +483,9 @@ input[type=file] > input[type=button]::-moz-focus-inner {
   text-align: center;
 }
 
-.margin-top {
+/* .margin-top {
   margin-top: 50px;
-}
+} */
 
 .btn {
   border-width: 2px;
@@ -1102,11 +1102,11 @@ input[type=file] > input[type=button]::-moz-focus-inner {
 
 .fresh-table {
   background-color: #FFFFFF;
-  border-radius: 10px;
+  border-radius: 5px;
   color: #666666;
 }
 .fresh-table .btn {
-  border-radius: 30px !important;
+  border-radius: 5px !important;
 }
 .fresh-table a {
   color: #AAAAAA;
@@ -1137,7 +1137,7 @@ input[type=file] > input[type=button]::-moz-focus-inner {
   border-bottom-left-radius: 30px !important;
 }
 .fresh-table .fixed-table-toolbar .search.input-group .form-control:first-child {
-  border-top-right-radius: 30px !important;
+  border-top-right-radius: 5px !important;
   border-bottom-right-radius: 30px !important;
 }
 .fresh-table .fixed-table-toolbar .columns label {
@@ -1266,14 +1266,20 @@ input[type=file] > input[type=button]::-moz-focus-inner {
 .fresh-table .table > tbody > tr > th,
 .fresh-table .table > tfoot > tr > th {
   border-color: #E3E3E3;
+  padding: 5px;
+  margin: 0 2px;
 }
 .fresh-table .table > thead > tr > td,
 .fresh-table .table > tbody > tr > td,
 .fresh-table .table > tfoot > tr > td {
   border-color: rgba(220, 220, 220, 0.15);
+  padding: 5px;
+  margin: 0 2px;
 }
 .fresh-table .table.table-striped > thead > tr > td, .fresh-table .table.table-striped > tbody > tr > td, .fresh-table .table.table-striped > tfoot > tr > td {
   border: none;
+  padding: 5px;
+  margin: 0 2px;
 }
 .fresh-table .pagination > li > a,
 .fresh-table .pagination > li > span,
