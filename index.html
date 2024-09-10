@@ -129,6 +129,8 @@
     const tenantsPerBatch = 1000;
     let startIndex = 0;
     let worker;
+    let shoppingCenterVisits = [];
+
 
     function downloadCSV(data, filename) {
       const csv = Papa.unparse(data, { header: true });
@@ -144,7 +146,7 @@
 
     function updateTenantList(tenants) {
       const tenantList = document.getElementById('tenant-list');
-      tenantList.innerHTML = ''; // Clear existing list
+      tenantList.innerHTML = ''; 
 
       tenants.forEach(tenant => {
         const li = document.createElement('li');
@@ -158,7 +160,7 @@
           } else {
             selectedTenants.delete(this.value);
           }
-          applyFiltersDebounced(); // Apply filters with debounce
+          applyFiltersDebounced();
         });
         li.appendChild(checkbox);
         li.appendChild(document.createTextNode(` ${tenant}`));
@@ -196,10 +198,10 @@
       const minGlaValue = $('#gla-slider').slider('values', 0);
       const maxGlaValue = $('#gla-slider').slider('values', 1);
 
-      if (worker) worker.terminate(); // Terminate any previous worker
-      worker = new Worker('./assets/filterWorker.js'); // Create a new worker
+      if (worker) worker.terminate(); 
+      worker = new Worker('./assets/filterWorker.js'); 
 
-      // Log the data being sent to the worker
+      
       console.log('Sending data to worker:', {
           allData,
           tenantData,
@@ -207,8 +209,6 @@
           minGlaValue,
           maxGlaValue
       });
-
-      // Send data to the worker for processing
       worker.postMessage({ 
           allData, 
           tenantData, 
@@ -217,27 +217,25 @@
           maxGlaValue 
       });
 
-      // Handle the response from the worker
       worker.onmessage = function(event) {
           console.log('Worker returned filtered data:', event.data);
           filteredData = event.data;
           $('#mall-table').bootstrapTable('load', filteredData);
       };
 
-      // Log if the worker encounters an error
       worker.onerror = function(error) {
           console.error('Worker encountered an error:', error.message);
       };
     }
 
-    const applyFiltersDebounced = debounce(applyFilters, 300); // Debounce the filter application
+    const applyFiltersDebounced = debounce(applyFilters, 300); 
 
     function deselectAllTenants() {
       selectedTenants.clear();
       document.querySelectorAll('.tenant-list input[type="checkbox"]').forEach(checkbox => {
         checkbox.checked = false;
       });
-      applyFilters(); // Re-apply filters after deselecting all tenants
+      applyFilters();
     }
 
     document.getElementById('deselect-all').addEventListener('click', deselectAllTenants);
@@ -253,9 +251,8 @@
       const detailsRow = $(detailsRowId);
 
       if (detailsRow.length) {
-        detailsRow.toggle(); // Toggle visibility if row already exists
+        detailsRow.toggle(); 
       } else {
-        // Insert a new row for tenant details
         const tenantRows = tenantData
           .filter(tenant => tenant.complex_id === complexId)
           .map(tenant => `
@@ -276,9 +273,38 @@
           `)
           .join('');
 
+          const visitRows = shoppingCenterVisits
+          .filter(visit => visit.complex_id === complexId)
+          .map(visit => `
+            <tr>
+              <td style="padding: 8px;">${visit.month}</td>
+              <td style="padding: 8px;">${numeral(visit.ft).format('0.0a')}</td>
+              <td style="padding: 8px;">${numeral(visit.yoy1).format('0.0%')}</td>
+              <td style="padding: 8px;">${numeral(visit.yoy2).format('0.0%')}</td>
+              <td style="padding: 8px;">${numeral(visit.yoy3).format('0.0%')}</td>
+            </tr>
+          `)
+          .join('');  
+
         const newDetailsRow = `
           <tr id="details-row-${complexId}" class="tenant-details-row">
             <td colspan="12">
+              <h4>Shopping Center Visits</h4>
+              <table class="fresh-table table-striped" border="1" style="border: #f2f2f2;">
+                <thead>
+                  <tr style="padding: 8px;">
+                    <th style="padding: 8px;">Month</th>
+                    <th style="padding: 8px;">FT</th>
+                    <th style="padding: 8px;">YOY1</th>
+                    <th style="padding: 8px;">YOY2</th>
+                    <th style="padding: 8px;">YOY3</th>
+                  </tr>
+                  </thead>
+            <tbody style="padding: 8px;">${visitRows}</tbody>
+          </table>
+
+              <h4>Tenants</h4>
+
               <table class="fresh-table table-striped" border="1" style="border: #f2f2f2;">
                 <thead>
                   <tr  style="padding: 8px;">
@@ -306,6 +332,16 @@
       }
     };
 
+    // fetch and parse sc metrics
+    Papa.parse('./assets/shopping_center_visits000000000000.csv', {
+      download: true,
+      header: true,
+      complete: function(results) {
+        shoppingCenterVisits = results.data;
+      }
+    });
+
+
     // Fetch and parse tenant data CSV
     fetch('./assets/tenants000000000000.csv')
       .then(response => response.text())
@@ -316,12 +352,10 @@
 
         // Generate the unique tenant list
         uniqueTenants = [...new Set(tenantData.map(item => item.tenant_name))]
-          .filter(name => name)  // Filter out undefined or null tenant names
+          .filter(name => name)  
           .sort((a, b) => a.localeCompare(b));  // Sort in ascending alphabetical order
 
         console.log('Total Unique Tenants:', uniqueTenants.length);
-
-        // Initialize selectedTenants with all tenants checked by default
         uniqueTenants.forEach(tenant => selectedTenants.add(tenant));
 
         // Render the first batch of tenants
@@ -360,8 +394,8 @@
               item.gla_sq_ft = numeral(item.gla_sq_ft || '0').format('0.0a');
             });
 
-            // Populate the table with all data initially
-            filteredData = allData.slice(); // Make a copy of allData
+            
+            filteredData = allData.slice(); 
             $('#mall-table').bootstrapTable({
               data: filteredData,
               search: true,
