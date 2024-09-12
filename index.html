@@ -15,6 +15,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  
   
   <style>
     .container {
@@ -67,6 +70,25 @@
     margin: 5px, 5px, 5px, 5px;
   }
 
+  .mall-details {
+  padding: 20px;
+}
+
+.summary-widgets {
+  margin-bottom: 20px;
+}
+
+.summary-widget {
+  padding: 10px;
+  border: 1px solid #ddd;
+  margin-bottom: 10px;
+}
+
+.summary-widget h4 {
+  margin: 0;
+}
+
+
 
 
 
@@ -112,12 +134,20 @@
           </tr>
         </thead>
         <tbody id="mall-table-body">
+            <div id="mall-details" class="mall-details" style="display: none;">
+    <div class="summary-widgets">
+      <!-- Summary Widgets will be added dynamically -->
+    </div>
+    <canvas id="mall-chart" width="400" height="200"></canvas>
+  </div>
         </tbody>
       </table>
 
       <button id="download-button" class="btn btn-success">Download CSV</button>
     </div>
   </div>
+
+  <script src="./js/csvExport.js"></script>
 
   <script>
     let allData = [];
@@ -132,17 +162,7 @@
     let shoppingCenterVisits = [];
 
 
-    function downloadCSV(data, filename) {
-      const csv = Papa.unparse(data, { header: true });
-      const csvBlob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(csvBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
+
 
     function updateTenantList(tenants) {
       const tenantList = document.getElementById('tenant-list');
@@ -199,7 +219,7 @@
       const maxGlaValue = $('#gla-slider').slider('values', 1);
 
       if (worker) worker.terminate(); 
-      worker = new Worker('./assets/filterWorker.js'); 
+      worker = new Worker('./js/filterWorker.js'); 
 
       
       console.log('Sending data to worker:', {
@@ -246,91 +266,229 @@
       `;
     }
 
+    
+
     window.toggleDetails = function(complexId, button) {
-      const detailsRowId = `#details-row-${complexId}`;
-      const detailsRow = $(detailsRowId);
+    const detailsRowId = `#details-row-${complexId}`;
+    const detailsRow = $(detailsRowId);
 
-      if (detailsRow.length) {
-        detailsRow.toggle(); 
-      } else {
+    console.log('Details Row ID:', detailsRowId);
+    console.log('Details Row Element:', detailsRow);
+
+    if (detailsRow.length) {
+        detailsRow.toggle();
+    } else {
+        console.log('Details Row Not Found');
+
+        const filteredVisits = shoppingCenterVisits.filter(visit => visit.complex_id === complexId);
+        const totalFT = filteredVisits.reduce((total, visit) => total + parseFloat(visit.ft) || 0, 0);
+        const averageFT = filteredVisits.length > 0 ? totalFT / filteredVisits.length : 0;
+
+        const totalYOY1 = filteredVisits.reduce((total, visit) => total + parseFloat(visit.yoy1) || 0, 0);
+        const averageYOY1 = filteredVisits.length > 0 ? totalYOY1 / filteredVisits.length : 0;
+
+        const totalYOY2 = filteredVisits.reduce((total, visit) => total + parseFloat(visit.yoy2) || 0, 0);
+        const averageYOY2 = filteredVisits.length > 0 ? totalYOY2 / filteredVisits.length : 0;
+
+        const totalYOY3 = filteredVisits.reduce((total, visit) => total + parseFloat(visit.yoy3) || 0, 0);
+        const averageYOY3 = filteredVisits.length > 0 ? totalYOY3 / filteredVisits.length : 0;
+
+        const totalVisitsByComplex = shoppingCenterVisits.reduce((acc, visit) => {
+            if (!acc[visit.complex_id]) {
+                acc[visit.complex_id] = 0;
+            }
+            acc[visit.complex_id] += parseFloat(visit.ft) || 0;
+            return acc;
+        }, {});
+
+        const mallTotalVisits = totalVisitsByComplex[complexId] || 0;
+        const allTotalVisits = Object.values(totalVisitsByComplex);
+        const averageTotalVisits = allTotalVisits.length > 0 ?
+            allTotalVisits.reduce((sum, visits) => sum + visits, 0) / allTotalVisits.length : 0;
+
+        const comparison = mallTotalVisits >= averageTotalVisits ? 'above' : 'below';
+        console.log(`Mall ${complexId} has ${comparison} the average total visits.`);
+
+        const sortedComplexes = Object.entries(totalVisitsByComplex)
+            .map(([id, total]) => ({ id, total }))
+            .sort((a, b) => b.total - a.total);
+
+        const complexIndex = sortedComplexes.findIndex(complex => complex.id === complexId);
+        const rank = complexIndex >= 0 ? complexIndex + 1 : 'N/A';
+        console.log('Overall Rank:', rank);
+
+        const months = filteredVisits.map(visit => visit.month);
+        const totalVisits = filteredVisits.map(visit => parseFloat(visit.ft) || 0);
+
+
+        const uniqueTenantIds = new Set(tenantData
+            .filter(tenant => tenant.complex_id === complexId)
+            .map(tenant => tenant.tenant_id));
+        const uniqueTenantCount = uniqueTenantIds.size;
+
+        const tenantFTValues = tenantData
+            .filter(tenant => tenant.complex_id === complexId)
+            .map(tenant => parseFloat(tenant.ft) || 0);
+
+            const totalTenantFT = tenantFTValues.reduce((total, ft) => total + ft, 0);
+
+        const averageTenantFT = tenantFTValues.length > 0 ? totalTenantFT / tenantFTValues.length : 0;
+
+        const tenantYOYValues = tenantData
+            .filter(tenant => tenant.complex_id === complexId)
+            .map(tenant => parseFloat(tenant.yoy) || 0);
+
+        const totalTenantYOY = tenantYOYValues.reduce((total, yoy) => total + yoy, 0);
+        const averageTenantYOY = tenantYOYValues.length > 0 ? totalTenantYOY / tenantYOYValues.length : 0;
+
+
         const tenantRows = tenantData
-          .filter(tenant => tenant.complex_id === complexId)
-          .map(tenant => `
-            <tr>
-              <td style="padding: 8px;font-size: 10px;">${tenant.tenant_id}</td>
-              <td style="padding: 8px;">${tenant.tenant_name}</td>
-              <td style="padding: 8px;">${tenant.store_id}</td>
-              <td style="padding: 8px; font-size: 10px;">${tenant.chain_id}</td>
-              <td style="padding: 8px;">${tenant.date_opened}</td>
-              <td style="padding: 8px;">${tenant.date_closed}</td>
-              <td style="padding: 8px;">${tenant.tenant_group_category}</td>
-              <td style="padding: 8px;">${tenant.tenant_primary_category}</td>
-              <td style="padding: 8px;">${tenant.tenant_sub_category}</td>
-              <td style="padding: 8px;">${tenant.month}</td>
-          <td  style="padding: 8px;">${numeral(tenant.ft).format('0.0a')}</td>
-          <td style="padding: 8px;">${numeral(tenant.yoy).format('0.0%')}</td>
-            </tr>
-          `)
-          .join('');
+            .filter(tenant => tenant.complex_id === complexId)
+            .map(tenant => `
+                <tr>
+                    <td style="padding: 8px;font-size: 10px;">${tenant.tenant_id}</td>
+                    <td style="padding: 8px;">${tenant.tenant_name}</td>
+                    <td style="padding: 8px;">${tenant.store_id}</td>
+                    <td style="padding: 8px; font-size: 10px;">${tenant.chain_id}</td>
+                    <td style="padding: 8px;">${tenant.date_opened}</td>
+                    <td style="padding: 8px;">${tenant.date_closed}</td>
+                    <td style="padding: 8px;">${tenant.tenant_group_category}</td>
+                    <td style="padding: 8px;">${tenant.tenant_primary_category}</td>
+                    <td style="padding: 8px;">${tenant.tenant_sub_category}</td>
+                    <td style="padding: 8px;">${tenant.month}</td>
+                    <td style="padding: 8px;">${numeral(tenant.ft).format('0.0a')}</td>
+                    <td style="padding: 8px;">${numeral(tenant.yoy).format('0.0%')}</td>
+                </tr>
+            `)
+            .join('');
 
-          const visitRows = shoppingCenterVisits
-          .filter(visit => visit.complex_id === complexId)
-          .map(visit => `
+        const visitRows = filteredVisits.map(visit => `
             <tr>
-              <td style="padding: 8px;">${visit.month}</td>
-              <td style="padding: 8px;">${numeral(visit.ft).format('0.0a')}</td>
-              <td style="padding: 8px;">${numeral(visit.yoy1).format('0.0%')}</td>
-              <td style="padding: 8px;">${numeral(visit.yoy2).format('0.0%')}</td>
-              <td style="padding: 8px;">${numeral(visit.yoy3).format('0.0%')}</td>
+                <td style="padding: 8px;">${visit.month}</td>
+                <td style="padding: 8px;">${numeral(visit.ft).format('0.0a')}</td>
+                <td style="padding: 8px;">${numeral(visit.yoy1).format('0.0%')}</td>
+                <td style="padding: 8px;">${numeral(visit.yoy2).format('0.0%')}</td>
+                <td style="padding: 8px;">${numeral(visit.yoy3).format('0.0%')}</td>
             </tr>
-          `)
-          .join('');  
+        `).join('');
 
         const newDetailsRow = `
-          <tr id="details-row-${complexId}" class="tenant-details-row">
-            <td colspan="12">
-              <h4>Shopping Center Visits</h4>
-              <table class="fresh-table table-striped" border="1" style="border: #f2f2f2;">
-                <thead>
-                  <tr style="padding: 8px;">
-                    <th style="padding: 8px;">Month</th>
-                    <th style="padding: 8px;">FT</th>
-                    <th style="padding: 8px;">YOY1</th>
-                    <th style="padding: 8px;">YOY2</th>
-                    <th style="padding: 8px;">YOY3</th>
-                  </tr>
-                  </thead>
-            <tbody style="padding: 8px;">${visitRows}</tbody>
-          </table>
+            <tr id="details-row-${complexId}" class="tenant-details-row">
+                <td colspan="12">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="flex: 1; margin-right: 20px;">
+                          <div class="col-md-12">
+                         <div class="col-md-4"> 
+                          <h4>Shopping Center Visits</h4>
+                            <p style="margin-top: 10px;">Total FT for this shopping center: <strong>${numeral(totalFT).format('0.0a')}</strong></p>
 
-              <h4>Tenants</h4>
+                            <p style="margin-top: 5px;">Rank: <strong>${rank === 'N/A' ? rank : numeral(rank).format('0,0o')}</strong></p>
 
-              <table class="fresh-table table-striped" border="1" style="border: #f2f2f2;">
-                <thead>
-                  <tr  style="padding: 8px;">
-                    <th style="padding: 8px;">Tenant ID</th>
-                    <th style="padding: 8px;">Tenant Name</th>
-                    <th style="padding: 8px;">Store ID</th>
-                    <th style="padding: 8px;">Chain ID</th>
-                    <th style="padding: 8px;">Date Opened</th>
-                    <th style="padding: 8px;">Date Closed</th>
-                    <th style="padding: 8px;">Group Category</th>
-                    <th style="padding: 8px;">Primary Category</th>
-                    <th style="padding: 8px;">Sub Category</th>
-                    <th style="padding: 8px;">Month</th>
-                    <th  style="padding: 8px;">FT</th>
-                    <th style="padding: 8px;">YOY</th>
-                  </tr>
-                </thead>
-                <tbody  style="padding: 8px;">${tenantRows}</tbody>
-              </table>
-            </td>
-          </tr>
+                            
+                            <p><i>This mall's total visits are ${comparison} the average: ${numeral(averageTotalVisits).format('0.0a')}</i></p>
+
+                            <canvas id="chart-${complexId}" style="max-width: 100%; max-height: 200px;"></canvas>
+
+
+                          </div>
+                          <div style="flex: 2;" class="col-md-4">
+                            <h4>Totals (Last Full 12Mo)</h4>
+                             <p>Total FT: <strong>${numeral(totalFT).format('0.0a')}</strong><p
+                        
+                            <p>Total YOY1: <strong>${numeral(totalYOY1).format('+0.0%')}</strong><p>
+                         
+                            <p>Total YOY2: <strong>${numeral(totalYOY2).format('+0.0%')}</strong></p>
+                       
+                            <p>Total YOY3: <strong>${numeral(totalYOY3).format('+0.0%')}</strong></p>
+                          
+
+                        </div>
+                        <div style="flex: 2;" class="col-md-4">
+                                                        <h4>Averages (Last Full 12Mo)</h4>
+
+                            <p>Average FT: <strong>${numeral(averageFT).format('0.0a')}</strong></p>
+                            
+                            <p>Average YOY1: <strong>${numeral(averageYOY1).format('+0.0%')}</strong></p>
+                            
+                            <p>Average YOY2: <strong>${numeral(averageYOY2).format('+0.0%')}</strong></p>
+                           
+                            <p>Average YOY3: <strong>${numeral(averageYOY3).format('+0.0%')}</strong></p>
+
+                        </div>
+                      </div>
+                            
+                            <div class="col-md-6"><h4>Tenants: <strong>${numeral(uniqueTenantCount).format('0,0')}</strong> </div></h4> <div class="col-md-6" style="text-align:right"><h4>Avg Tenant FT: <strong>${numeral(averageTenantFT).format('0,0.0a')}</strong> | Avg YOY: <strong>${numeral(averageTenantYOY).format('+0.0%')}</strong></h4></div>
+                            <table class="fresh-table table-striped" border="1" style="border: #f2f2f2; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 8px;">Tenant ID</th>
+                                        <th style="padding: 8px;">Tenant Name</th>
+                                        <th style="padding: 8px;">Store ID</th>
+                                        <th style="padding: 8px;">Chain ID</th>
+                                        <th style="padding: 8px;">Date Opened</th>
+                                        <th style="padding: 8px;">Date Closed</th>
+                                        <th style="padding: 8px;">Tenant Group Category</th>
+                                        <th style="padding: 8px;">Tenant Primary Category</th>
+                                        <th style="padding: 8px;">Tenant Sub Category</th>
+                                        <th style="padding: 8px;">Month</th>
+                                        <th style="padding: 8px;">FT</th>
+                                        <th style="padding: 8px;">YOY</th>
+                                    </tr>
+                                </thead>
+                                <tbody style="padding: 8px;">
+                                    ${tenantRows}
+                                </tbody>
+                            </table>
+                        
+                        </div>
+                        
+                    </div>
+                    
+                </td>
+            </tr>
         `;
 
         $(button).closest('tr').after(newDetailsRow);
-      }
-    };
+
+        const ctx = document.getElementById(`chart-${complexId}`).getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Monthly Visits',
+                    data: totalVisits,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Visits'
+                        }
+                    }
+                }
+            }
+        });
+    }
+};
+
+
+
+
+
+
+
 
     // fetch and parse sc metrics
     Papa.parse('./assets/shopping_center_visits000000000000.csv', {
@@ -398,6 +556,7 @@
             filteredData = allData.slice(); 
             $('#mall-table').bootstrapTable({
               data: filteredData,
+              
               search: true,
               pagination: true,
               showColumns: true,
